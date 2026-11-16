@@ -1,0 +1,42 @@
+name: Publicar en GitHub Pages
+# Se publica a mano (Actions > Publicar > Run workflow) o al subir cambios a main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Construir
+        run: npm run build:pages
+        env:
+          # Variables del repositorio (Settings > Secrets and variables > Actions > Variables):
+          #   VITE_API_BASE_URL  direccion de la API (ej. https://api.midominio.com). Vacia si se usa el modo de ejemplo.
+          #   VITE_DATA_SOURCE   "sample" para mostrar solo datos de ejemplo (sin backend).
+          #   VITE_BASE          "/" si hay dominio propio; si no, queda /<nombre-del-repo>/
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_DATA_SOURCE: ${{ vars.VITE_DATA_SOURCE }}
+          VITE_BASE: ${{ vars.VITE_BASE || format('/{0}/', github.event.repository.name) }}
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pagina.outputs.page_url }}
+    steps:
+      - id: pagina
+        uses: actions/deploy-pages@v4
